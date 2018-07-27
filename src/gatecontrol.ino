@@ -19,6 +19,12 @@ long closeDelay = 10 * 60 * 1000;
 long lastClosed = 0;
 long closeThreshold = 4.2 * closeDelay;
 
+long cycle = 0;
+long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
+
+long buttonOn = 0;
+long longPress = 800;
+
 const int OFF = HIGH;
 const int ON = LOW;
 
@@ -34,7 +40,7 @@ void setup() {
   pinMode(Bell, OUTPUT);
   digitalWrite(Impulse, OFF);
   digitalWrite(Bell, OFF);
-
+  
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -132,6 +138,16 @@ void AutoClose() {
   }
 }
 
+void EndCycle() {
+    cycle = 0;
+    ControlPress();
+}
+
+void StartCycle() {
+  ControlPress();
+  cycle = millis();
+}
+
 void loop() {
   // put your main code here, to run repeatedly:
   server.handleClient();
@@ -142,11 +158,23 @@ void loop() {
   if (millis() - lastClosed <= closeThreshold) {
     AutoClose();
   }
+  if (cycle > 0 && (millis() > cycle + cycleTime)) {
+    EndCycle();
+  }
   int reading = digitalRead(Control);
   if (reading != lastControlState) {
     if (millis() - lastDebounceTime > debounceDelay) {
       if (reading == LOW) {
-        ControlPress();
+        buttonOn = millis();
+        // ControlPress();
+      }
+      if (reading == HIGH) {
+        long pressTime = millis() - buttonOn;
+        if (pressTime < longPress) {
+          ControlPress();
+        } else {
+          StartCycle();
+        }
       }
     }
     lastDebounceTime = millis();
