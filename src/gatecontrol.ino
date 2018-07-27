@@ -143,12 +143,21 @@ void AutoClose() {
 
 void EndCycle() {
     cycle = 0;
-    ControlPress();
+    int positionState = digitalRead(Position);
+    // If already closed, don't reopen
+    if (positionState == GateOPEN) {
+      ControlPress();
+    }
 }
 
+// Do a open-close cycle, if already open, fall back to default behaviour
 void StartCycle() {
+  int positionState = digitalRead(Position);
   ControlPress();
-  cycle = millis();
+  // If the gate is already open, don't schedule a close
+  if (positionState == GateOPEN) {
+    cycle = millis();
+  }
 }
 
 void loop() {
