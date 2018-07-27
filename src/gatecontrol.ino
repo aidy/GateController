@@ -1,6 +1,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
+#include <ArduinoOTA.h>
 #include <config.h>
 
 const int Control = 0;
@@ -40,7 +41,7 @@ void setup() {
   pinMode(Bell, OUTPUT);
   digitalWrite(Impulse, OFF);
   digitalWrite(Bell, OFF);
-  
+
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid, password);
   while (WiFi.status() != WL_CONNECTED) {
@@ -79,6 +80,8 @@ void setup() {
   server.on("/config", HTTP_POST, handleConfig);
 
   server.begin();
+
+  ArduinoOTA.begin();
 }
 
 void handleConfig() {
@@ -150,6 +153,7 @@ void StartCycle() {
 
 void loop() {
   // put your main code here, to run repeatedly:
+  ArduinoOTA.handle();
   server.handleClient();
   int positionState = digitalRead(Position);
   if (positionState == GateCLOSED) {
