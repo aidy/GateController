@@ -49,9 +49,6 @@ void setup() {
 
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-  }
 
   server.on("/", [](){
     int positionState = digitalRead(Position);
