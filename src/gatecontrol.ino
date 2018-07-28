@@ -3,7 +3,7 @@
 #include <ESP8266WebServer.h>
 #include <ArduinoOTA.h>
 #include <WiFiClientSecure.h>
-#include <TelegramBot.h>
+#include <TelegramBotClient.h>
 #include <config.h>
 
 const int Control = 0;
@@ -35,7 +35,7 @@ const int GateOPEN = HIGH;
 const int GateCLOSED = LOW;
 
 WiFiClientSecure net_ssl;
-TelegramBot telegram (BotToken, net_ssl);
+TelegramBotClient telegram (BotToken, net_ssl);
 
 ESP8266WebServer server(80);
 
@@ -119,7 +119,7 @@ void ControlPress() {
   digitalWrite(Impulse, OFF);
   digitalWrite(Bell, OFF);
   if (positionState == GateCLOSED) {
-    telegram.sendMessage(TelegramId, "Gate opening");
+    telegram.postMessage(TelegramId, "Gate opening");
   }
   lastCheck = millis();
 }
