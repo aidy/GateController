@@ -129,6 +129,8 @@ void ControlPress() {
     telegram.postMessage(TelegramId, "Gate opening");
   }
   lastCheck = millis();
+  // reset any cycle operations that are pending.
+  cycle = 0;
 }
 
 void Close() {
