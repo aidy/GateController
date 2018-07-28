@@ -26,7 +26,7 @@ long cycle = 0;
 long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
 
 long buttonOn = 0;
-long longPress = 800;
+long longPress = 1500;
 
 const int OFF = HIGH;
 const int ON = LOW;
