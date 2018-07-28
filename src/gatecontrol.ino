@@ -36,6 +36,8 @@ const int GateCLOSED = LOW;
 
 int initialPosition = GateCLOSED;
 
+bool startup = true;
+
 WiFiClientSecure net_ssl;
 TelegramBotClient telegram (BotToken, net_ssl);
 
@@ -176,6 +178,12 @@ void loop() {
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
   server.handleClient();
+  if (startup == true) {
+    lastClosed = millis();
+    lastControlState = digitalRead(Control);
+    lastDebounceTime = millis();
+    startup = false;
+  }
   int positionState = digitalRead(Position);
   if (positionState == GateCLOSED) {
     lastClosed = millis();
