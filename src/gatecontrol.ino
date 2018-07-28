@@ -12,7 +12,7 @@ const int Position = 2;
 const int Bell = 3;
 
 int lastControlState = LOW;
-long debounceDelay = 50;
+long debounceDelay = 10;
 long lastDebounceTime = 0;
 
 int toggleTime = 500;
@@ -33,6 +33,8 @@ const int ON = LOW;
 
 const int GateOPEN = HIGH;
 const int GateCLOSED = LOW;
+
+int initialPosition = GateCLOSED;
 
 WiFiClientSecure net_ssl;
 TelegramBotClient telegram (BotToken, net_ssl);
@@ -57,6 +59,12 @@ void setup() {
     if (positionState == GateOPEN) {
       state = "Open";
       nextClose = (closeDelay - (millis() - lastCheck))/1000;
+      if (cycle > 0) {
+        long cycleClose = (cycleTime - (millis() - cycle))/1000;
+        if (cycleClose < nextClose) {
+          nextClose = cycleClose;
+        }
+      }
     }
     String autoclose = "Inactive";
     if (millis() - lastClosed <= closeThreshold) {
@@ -157,11 +165,9 @@ void EndCycle() {
 }
 
 // Do a open-close cycle, if already open, fall back to default behaviour
-void StartCycle() {
-  int positionState = digitalRead(Position);
-  ControlPress();
+void StartCycle(int initialPosition) {
   // If the gate is already open, don't schedule a close
-  if (positionState == GateOPEN) {
+  if (initialPosition == GateCLOSED) {
     cycle = millis();
   }
 }
@@ -177,26 +183,23 @@ void loop() {
   if (millis() - lastClosed <= closeThreshold) {
     AutoClose();
   }
-  if (cycle > 0 && (millis() > cycle + cycleTime)) {
+
+  if (cycle > 0 && (millis() - cycle >= cycleTime)) {
     EndCycle();
   }
+
   int reading = digitalRead(Control);
-  if (reading != lastControlState) {
-    if (millis() - lastDebounceTime > debounceDelay) {
-      if (reading == LOW) {
-        buttonOn = millis();
-        // ControlPress();
-      }
-      if (reading == HIGH) {
-        long pressTime = millis() - buttonOn;
-        if (pressTime < longPress) {
-          ControlPress();
-        } else {
-          StartCycle();
-        }
-      }
+
+  if (reading != lastControlState && (millis() - lastDebounceTime > debounceDelay)) {
+    reading = digitalRead(Control);
+    if (reading == LOW) {
+      buttonOn = millis();
+      initialPosition = digitalRead(Position);
+      ControlPress();
+    } else if (millis() - buttonOn >= longPress) {
+        StartCycle(initialPosition);
     }
+    lastControlState = reading;
     lastDebounceTime = millis();
   }
-  lastControlState = reading;
 }
