@@ -69,9 +69,10 @@ void setup() {
         }
       }
     }
-    String autoclose = "Inactive";
-    if (millis() - lastClosed <= closeThreshold) {
-      autoclose = "Active";
+    String autoclose = "Active";
+    if (millis() - lastClosed > closeThreshold) {
+      autoclose = "Inactive";
+      nextClose = 0;
     }
 
     server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
