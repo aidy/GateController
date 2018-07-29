@@ -44,6 +44,9 @@ int initialPosition = GateCLOSED;
 
 bool startup = true;
 
+long lastClosingSignal = 0;
+long closeSignalThreshold = 1500;
+
 WiFiClientSecure net_ssl;
 TelegramBotClient telegram (BotToken, net_ssl);
 
@@ -87,6 +90,14 @@ void setup() {
         if (cycleClose < nextClose) {
           nextClose = cycleClose;
         }
+      }
+      if (millis() - lastClosingSignal <= closeSignalThreshold) {
+        state = "Closing";
+          if (digitalRead(Photocell) == OFF) {
+            state = state + ": photocell broken";
+          } else {
+            state = state + ": photocell intact";
+          }
       }
     }
     String autoclose = "Active";
@@ -219,6 +230,19 @@ void loop() {
     lastControlState = digitalRead(Control);
     lastDebounceTime = millis();
     startup = false;
+  }
+  int closing = digitalRead(ClosingSignal);
+  if (closing == ON) {
+    lastClosingSignal = millis();
+  }
+  if (millis() - lastClosingSignal <= closeSignalThreshold) {
+    // Gate is closing
+    if (digitalRead(Photocell) == OFF) {
+       // Photocell has been broken
+       digitalWrite(CutOut, ON);
+       delay(500);
+       digitalWrite(CutOut, OFF);
+    }
   }
   int positionState = digitalRead(Position);
   if (positionState == GateCLOSED) {
