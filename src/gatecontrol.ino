@@ -4,6 +4,7 @@
 #include <ArduinoOTA.h>
 #include <WiFiClientSecure.h>
 #include <TelegramBotClient.h>
+#include <ESP8266HTTPClient.h>
 #include <config.h>
 
 const int Control = 0;
@@ -126,6 +127,12 @@ void ControlPress() {
   digitalWrite(Impulse, OFF);
   digitalWrite(Bell, OFF);
   if (positionState == GateCLOSED) {
+    if (NotifyURL != "") {
+      HTTPClient http;
+      http.begin(NotifyURL);
+      http.GET();
+      http.end();
+    }
     telegram.postMessage(TelegramId, "Gate opening");
   }
   lastCheck = millis();
