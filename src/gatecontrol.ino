@@ -92,6 +92,12 @@ void setup() {
     //server.send(200, "text/html", "");
   });
 
+  server.on("/disableautoclose", [](){
+    lastClosed = millis() - closeThreshold - 1000;
+    server.sendHeader("Location", "/");
+    server.send(303);
+  });
+
   server.on("/config", HTTP_POST, handleConfig);
 
   server.begin();
