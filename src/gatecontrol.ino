@@ -54,6 +54,7 @@ void setup() {
 
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid, password);
+  WiFi.mode(WIFI_STA);
 
   server.on("/", [](){
     int positionState = digitalRead(Position);
