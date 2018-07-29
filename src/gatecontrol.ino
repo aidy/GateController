@@ -7,10 +7,15 @@
 #include <ESP8266HTTPClient.h>
 #include <config.h>
 
-const int Control = 0;
-const int Impulse = 1;
-const int Position = 2;
-const int Bell = 3;
+const int Bell = 16;
+const int Impulse = 5;
+const int Pedestrian = 0;
+const int CutOut = 2; //13;
+
+const int Control = 14;
+const int Position = 12;
+const int Photocell = 3;
+const int ClosingSignal = 1;
 
 int lastControlState = LOW;
 long debounceDelay = 10;
@@ -45,13 +50,27 @@ TelegramBotClient telegram (BotToken, net_ssl);
 ESP8266WebServer server(80);
 
 void setup() {
-  pinMode(Control, INPUT);
-  pinMode(Impulse, OUTPUT);
-  pinMode(Position, INPUT);
   pinMode(Bell, OUTPUT);
-  digitalWrite(Impulse, OFF);
-  digitalWrite(Bell, OFF);
+  pinMode(Impulse, OUTPUT);
+  pinMode(Pedestrian, OUTPUT);
+  pinMode(CutOut, OUTPUT);
 
+  pinMode(Control, INPUT);
+  pinMode(Position, INPUT);
+  pinMode(Photocell, INPUT);
+  pinMode(ClosingSignal, INPUT);
+
+  digitalWrite(Bell, OFF);
+  digitalWrite(Impulse, OFF);
+  digitalWrite(Pedestrian, OFF);
+  digitalWrite(CutOut, OFF);
+  /*
+  pinMode(0, OUTPUT);
+  digitalWrite(0, ON);
+
+  pinMode(15, OUTPUT);
+  digitalWrite(15, ON);
+  */
   WiFi.config(ip, gateway, subnet);
   WiFi.begin(ssid, password);
   WiFi.mode(WIFI_STA);
