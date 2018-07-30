@@ -9,7 +9,7 @@
 
 const int Bell = 16;
 const int Impulse = 5;
-const int Pedestrian = 0;
+const int Pedestrian = 4;
 const int CutOut = 2; //13;
 
 const int Control = 14;
