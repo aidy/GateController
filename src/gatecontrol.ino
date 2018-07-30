@@ -27,6 +27,7 @@ long closeDelay = 10 * 60 * 1000;
 
 long lastClosed = 0;
 long closeThreshold = 4.2 * closeDelay;
+long closeDebounce = 200;
 
 long cycle = 0;
 long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
@@ -43,10 +44,7 @@ const int SWITCHON = LOW;
 const int RELAYOFF = HIGH;
 const int RELAYON = LOW;
 
-const int GateOPEN = HIGH;
-const int GateCLOSED = LOW;
-
-int initialPosition = GateCLOSED;
+bool GateClosed = false;
 
 bool startup = true;
 
@@ -85,10 +83,9 @@ void setup() {
   WiFi.mode(WIFI_STA);
 
   server.on("/", [](){
-    int positionState = digitalRead(Position);
     String state = "Closed";
     long nextClose = 0;
-    if (positionState == GateOPEN) {
+    if (!GateClosed) {
       state = "Open";
       nextClose = (closeDelay - (millis() - lastCheck))/1000;
       if (cycle > 0) {
@@ -162,15 +159,14 @@ void handleConfig() {
 }
 
 void ControlPress() {
-  int positionState = digitalRead(Position);
   digitalWrite(Impulse, ON);
-  if (positionState == GateCLOSED) {
+  if (GateClosed) {
     digitalWrite(Bell, ON);
   }
   delay(toggleTime);
   digitalWrite(Impulse, OFF);
   digitalWrite(Bell, OFF);
-  if (positionState == GateCLOSED) {
+  if (GateClosed) {
     if (NotifyURL != "") {
       HTTPClient http;
       http.begin(NotifyURL);
@@ -185,8 +181,7 @@ void ControlPress() {
 }
 
 void Close() {
-  int positionState = digitalRead(Position);
-  if (positionState == GateOPEN) {
+  if (!GateClosed) {
     digitalWrite(Impulse, ON);
     delay(toggleTime);
     digitalWrite(Impulse, OFF);
@@ -195,8 +190,7 @@ void Close() {
 }
 
 void Open() {
-  int positionState = digitalRead(Position);
-  if (positionState == GateCLOSED) {
+  if (GateClosed) {
     digitalWrite(Impulse, ON);
     delay(toggleTime);
     digitalWrite(Impulse, OFF);
@@ -212,17 +206,16 @@ void AutoClose() {
 
 void EndCycle() {
     cycle = 0;
-    int positionState = digitalRead(Position);
     // If already closed, don't reopen
-    if (positionState == GateOPEN) {
+    if (!GateClosed) {
       ControlPress();
     }
 }
 
 // Do a open-close cycle, if already open, fall back to default behaviour
-void StartCycle(int initialPosition) {
+void StartCycle(bool closed) {
   // If the gate is already open, don't schedule a close
-  if (initialPosition == GateCLOSED) {
+  if (closed) {
     cycle = millis();
   }
 }
@@ -251,8 +244,14 @@ void loop() {
     }
   }
   int positionState = digitalRead(Position);
-  if (positionState == GateCLOSED) {
+  if (positionState == SWITCHON) {
     lastClosed = millis();
+    lastCheck = millis();
+  }
+  if (millis() - lastClosed < closeDebounce) {
+    GateClosed = true;
+  } else {
+    GateClosed = false;
   }
   if (millis() - lastClosed <= closeThreshold) {
     AutoClose();
@@ -268,10 +267,9 @@ void loop() {
     reading = digitalRead(Control);
     if (reading == LOW) {
       buttonOn = millis();
-      initialPosition = digitalRead(Position);
       ControlPress();
     } else if (millis() - buttonOn >= longPress) {
-        StartCycle(initialPosition);
+        StartCycle(GateClosed);
     }
     lastControlState = reading;
     lastDebounceTime = millis();
