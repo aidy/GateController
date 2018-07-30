@@ -37,6 +37,12 @@ long longPress = 1500;
 const int OFF = LOW;
 const int ON = HIGH;
 
+const int SWITCHOFF = HIGH;
+const int SWITCHON = LOW;
+
+const int RELAYOFF = HIGH;
+const int RELAYON = LOW;
+
 const int GateOPEN = HIGH;
 const int GateCLOSED = LOW;
 
@@ -66,7 +72,7 @@ void setup() {
   digitalWrite(Bell, OFF);
   digitalWrite(Impulse, OFF);
   digitalWrite(Pedestrian, OFF);
-  digitalWrite(CutOut, OFF);
+  digitalWrite(CutOut, RELAYOFF);
   /*
   pinMode(0, OUTPUT);
   digitalWrite(0, ON);
@@ -93,7 +99,7 @@ void setup() {
       }
       if (millis() - lastClosingSignal <= closeSignalThreshold) {
         state = "Closing";
-          if (digitalRead(Photocell) == OFF) {
+          if (digitalRead(Photocell) == SWITCHOFF) {
             state = state + ": photocell broken";
           } else {
             state = state + ": photocell intact";
@@ -232,16 +238,16 @@ void loop() {
     startup = false;
   }
   int closing = digitalRead(ClosingSignal);
-  if (closing == ON) {
+  if (closing == SWITCHON) {
     lastClosingSignal = millis();
   }
   if (millis() - lastClosingSignal <= closeSignalThreshold) {
     // Gate is closing
-    if (digitalRead(Photocell) == OFF) {
+    if (digitalRead(Photocell) == SWITCHOFF) {
        // Photocell has been broken
-       digitalWrite(CutOut, ON);
+       digitalWrite(CutOut, RELAYON);
        delay(500);
-       digitalWrite(CutOut, OFF);
+       digitalWrite(CutOut, RELAYOFF);
     }
   }
   int positionState = digitalRead(Position);
