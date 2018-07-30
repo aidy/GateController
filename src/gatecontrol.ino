@@ -29,8 +29,8 @@ long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
 long buttonOn = 0;
 long longPress = 1500;
 
-const int OFF = HIGH;
-const int ON = LOW;
+const int OFF = LOW;
+const int ON = HIGH;
 
 const int GateOPEN = HIGH;
 const int GateCLOSED = LOW;
