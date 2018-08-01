@@ -51,6 +51,9 @@ bool startup = true;
 long lastClosingSignal = 0;
 long closeSignalThreshold = 1500;
 
+long reverseTime = 2000;
+long safetyGrace = 60 * 1000;
+
 WiFiClientSecure net_ssl;
 TelegramBotClient telegram (BotToken, net_ssl);
 
@@ -180,20 +183,22 @@ void ControlPress() {
   cycle = 0;
 }
 
+void SendImpulse() {
+  digitalWrite(Impulse, ON);
+  delay(toggleTime);
+  digitalWrite(Impulse, OFF);
+}
+
 void Close() {
   if (!GateClosed) {
-    digitalWrite(Impulse, ON);
-    delay(toggleTime);
-    digitalWrite(Impulse, OFF);
+    SendImpulse();
   }
   lastCheck = millis();
 }
 
 void Open() {
   if (GateClosed) {
-    digitalWrite(Impulse, ON);
-    delay(toggleTime);
-    digitalWrite(Impulse, OFF);
+    SendImpulse();
   }
   lastCheck = millis();
 }
@@ -220,6 +225,26 @@ void StartCycle(bool closed) {
   }
 }
 
+void StopGate() {
+  digitalWrite(CutOut, RELAYON);
+  delay(500);
+  digitalWrite(CutOut, RELAYOFF);
+}
+
+/*
+  CutOut behaviour is that the next impulses reverses direction
+  So we should impulse to start opening, and then cutout again.
+  We're then in a position to resume closing as soon as the photocell circuit
+  is complete.
+*/
+void SafetyStop() {
+  StopGate();
+  delay(100);
+  SendImpulse();
+  delay(reverseTime);
+  StopGate();
+}
+
 void loop() {
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
@@ -238,9 +263,7 @@ void loop() {
     // Gate is closing
     if (digitalRead(Photocell) == SWITCHOFF) {
        // Photocell has been broken
-       digitalWrite(CutOut, RELAYON);
-       delay(500);
-       digitalWrite(CutOut, RELAYOFF);
+       SafetyStop();
     }
   }
   int positionState = digitalRead(Position);
@@ -254,7 +277,15 @@ void loop() {
     GateClosed = false;
   }
   if (millis() - lastClosed <= closeThreshold) {
-    AutoClose();
+    if (digitalRead(Photocell) == SWITCHON) {
+      // Only attempt to autoclose if the photocell is intact
+      AutoClose();
+    } else {
+      // Otherwise push it out into the future.
+      lastCheck = millis() - closeDelay + safetyGrace;
+      // Reset lastClosed, in case there's something there for a while.
+      lastClosed = millis();
+    }
   }
 
   if (cycle > 0 && (millis() - cycle >= cycleTime)) {
