@@ -6,13 +6,14 @@
 #include <TelegramBotClient.h>
 #include <ESP8266HTTPClient.h>
 #include <RCSwitch.h>
+#include <relay.h>
 #include <config.h>
 
-const int Bell = 16;
-const int Impulse = 5;
-const int Pedestrian = 4;
-const int CutOut = 2; //13;
-const int CloseButton = 14;
+const int BellPin = 16;
+const int ImpulsePin = 5;
+const int PedestrianPin = 4;
+const int CutOutPin = 2; //13;
+const int ClosePin = 14;
 
 const int Control = 0;
 const int Position = 12;
@@ -25,7 +26,6 @@ int lastControlState = LOW;
 long debounceDelay = 10;
 long lastDebounceTime = 0;
 
-int toggleTime = 500;
 long lastCheck = 0;
 long closeDelay = 10 * 60 * 1000;
 
@@ -39,14 +39,8 @@ long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
 long buttonOn = 0;
 long longPress = 1500;
 
-const int OFF = LOW;
-const int ON = HIGH;
-
 const int SWITCHOFF = HIGH;
 const int SWITCHON = LOW;
-
-const int RELAYOFF = HIGH;
-const int RELAYON = LOW;
 
 bool GateClosed = false;
 
@@ -70,23 +64,23 @@ TelegramBotClient telegram (BotToken, net_ssl);
 
 ESP8266WebServer server(80);
 
+TransistorRelay Bell(BellPin);
+TransistorRelay Impulse(ImpulsePin);
+TransistorRelay Pedestrian(PedestrianPin);
+TransistorRelay CloseButton(ClosePin);
+Relay CutOut(CutOutPin);
+
 void setup() {
-  pinMode(Bell, OUTPUT);
-  pinMode(Impulse, OUTPUT);
-  pinMode(Pedestrian, OUTPUT);
-  pinMode(CutOut, OUTPUT);
-  pinMode(CloseButton, OUTPUT);
+  Bell.setup();
+  Impulse.setup();
+  Pedestrian.setup();
+  CloseButton.setup();
+  CutOut.setup();
 
   pinMode(Control, INPUT);
   pinMode(Position, INPUT);
   pinMode(Photocell, INPUT);
   pinMode(ClosingSignal, INPUT);
-
-  digitalWrite(Bell, OFF);
-  digitalWrite(Impulse, OFF);
-  digitalWrite(Pedestrian, OFF);
-  digitalWrite(CloseButton, OFF);
-  digitalWrite(CutOut, RELAYOFF);
 
   RFReceiver.enableReceive(RFPin);
 
@@ -207,13 +201,13 @@ void handleConfig() {
 
 void ControlPress() {
   lastPress = millis();
-  digitalWrite(Impulse, ON);
+  Impulse.Switch(true);
   if (GateClosed) {
-    digitalWrite(Bell, ON);
+    Bell.Switch(true);
   }
-  delay(toggleTime);
-  digitalWrite(Impulse, OFF);
-  digitalWrite(Bell, OFF);
+  delay(Impulse.toggleTime);
+  Impulse.Switch(false);
+  Bell.Switch(false);
   if (GateClosed) {
     if (NotifyURL != "") {
       HTTPClient http;
@@ -229,27 +223,23 @@ void ControlPress() {
 }
 
 void SendImpulse() {
-  digitalWrite(Impulse, ON);
-  delay(toggleTime);
-  digitalWrite(Impulse, OFF);
+  Impulse.Toggle();
 }
 
 void SendClose() {
-  digitalWrite(CloseButton, ON);
-  delay(toggleTime);
-  digitalWrite(CloseButton, OFF);
+  CloseButton.Toggle();
 }
 
 void Close() {
   if (!GateClosed) {
-    SendClose();
+    CloseButton.Toggle();
   }
   lastCheck = millis();
 }
 
 void Open() {
   if (GateClosed) {
-    SendImpulse();
+    Impulse.Toggle();
   }
   lastCheck = millis();
 }
@@ -277,9 +267,7 @@ void StartCycle(bool closed) {
 }
 
 void StopGate() {
-  digitalWrite(CutOut, RELAYON);
-  delay(500);
-  digitalWrite(CutOut, RELAYOFF);
+  CutOut.Toggle();
 }
 
 /*
@@ -291,7 +279,7 @@ void StopGate() {
 void SafetyStop() {
   StopGate();
   delay(100);
-  SendImpulse();
+  Impulse.Toggle();
   delay(reverseTime);
   StopGate();
 }
