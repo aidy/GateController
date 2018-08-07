@@ -5,6 +5,7 @@
 #include <WiFiClientSecure.h>
 #include <TelegramBotClient.h>
 #include <ESP8266HTTPClient.h>
+#include <RCSwitch.h>
 #include <config.h>
 
 const int Bell = 16;
@@ -16,6 +17,8 @@ const int Control = 14;
 const int Position = 12;
 const int Photocell = 3;
 const int ClosingSignal = 1;
+
+const int RFPin = 15;
 
 int lastControlState = LOW;
 long debounceDelay = 10;
@@ -51,8 +54,12 @@ bool startup = true;
 long lastClosingSignal = 0;
 long closeSignalThreshold = 1500;
 
-long reverseTime = 2000;
+long reverseTime = 4000;
 long safetyGrace = 60 * 1000;
+
+RCSwitch RFReceiver = RCSwitch();
+ulong lastRF = 0;
+ulong RFDebounce = 2500; // Flakey RF, so longer to allow for multiple presses.
 
 WiFiClientSecure net_ssl;
 TelegramBotClient telegram (BotToken, net_ssl);
@@ -74,6 +81,9 @@ void setup() {
   digitalWrite(Impulse, OFF);
   digitalWrite(Pedestrian, OFF);
   digitalWrite(CutOut, RELAYOFF);
+
+  RFReceiver.enableReceive(RFPin);
+
   /*
   pinMode(0, OUTPUT);
   digitalWrite(0, ON);
@@ -304,5 +314,24 @@ void loop() {
     }
     lastControlState = reading;
     lastDebounceTime = millis();
+  }
+
+  if (RFReceiver.available()) {
+    ulong received =  RFReceiver.getReceivedValue();
+    uint bl = RFReceiver.getReceivedBitlength();
+    uint proto = RFReceiver.getReceivedProtocol();
+    if (proto == 1 && bl == 24) {
+        // TODO: Make less awful.
+        if (received == 5795288 || received == 12789976 || received == 14979544 || received == 3769304 || received == 9903576) {
+          if (millis() - lastRF > RFDebounce) {
+            SendImpulse();
+            lastRF = millis();
+          }
+        }
+        if (received == 5795284 || received == 12789972 || received == 14979540 || received == 3769300 || received == 9903572) {
+            // TODO: Pedestrian.
+        }
+    }
+    RFReceiver.resetAvailable();
   }
 }
