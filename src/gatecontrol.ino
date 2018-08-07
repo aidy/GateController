@@ -97,8 +97,15 @@ void setup() {
   pinMode(15, OUTPUT);
   digitalWrite(15, ON);
   */
-  WiFi.config(ip, gateway, subnet);
-  WiFi.begin(ssid, password);
+  IPAddress ip;
+  IPAddress gw;
+  IPAddress subnet;
+  ip.fromString(IP_ADDRESS);
+  gw.fromString(IP_GATEWAY);
+  subnet.fromString(IP_SUBNET);
+
+  WiFi.config(ip, gw, subnet);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   WiFi.mode(WIFI_STA);
 
   server.on("/", [](){
