@@ -284,7 +284,7 @@ void loop() {
       // Otherwise push it out into the future.
       lastCheck = millis() - closeDelay + safetyGrace;
       // Reset lastClosed, in case there's something there for a while.
-      lastClosed = millis();
+      lastClosed = millis() - (2 * closeDebounce);
     }
   }
 
