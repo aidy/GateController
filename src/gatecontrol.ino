@@ -12,8 +12,9 @@ const int Bell = 16;
 const int Impulse = 5;
 const int Pedestrian = 4;
 const int CutOut = 2; //13;
+const int CloseButton = 14;
 
-const int Control = 14;
+const int Control = 0;
 const int Position = 12;
 const int Photocell = 3;
 const int ClosingSignal = 1;
@@ -74,6 +75,7 @@ void setup() {
   pinMode(Impulse, OUTPUT);
   pinMode(Pedestrian, OUTPUT);
   pinMode(CutOut, OUTPUT);
+  pinMode(CloseButton, OUTPUT);
 
   pinMode(Control, INPUT);
   pinMode(Position, INPUT);
@@ -83,6 +85,7 @@ void setup() {
   digitalWrite(Bell, OFF);
   digitalWrite(Impulse, OFF);
   digitalWrite(Pedestrian, OFF);
+  digitalWrite(CloseButton, OFF);
   digitalWrite(CutOut, RELAYOFF);
 
   RFReceiver.enableReceive(RFPin);
@@ -224,9 +227,15 @@ void SendImpulse() {
   digitalWrite(Impulse, OFF);
 }
 
+void SendClose() {
+  digitalWrite(CloseButton, ON);
+  delay(toggleTime);
+  digitalWrite(CloseButton, OFF);
+}
+
 void Close() {
   if (!GateClosed) {
-    SendImpulse();
+    SendClose();
   }
   lastCheck = millis();
 }
@@ -248,7 +257,7 @@ void EndCycle() {
     cycle = 0;
     // If already closed, don't reopen
     if (!GateClosed) {
-      ControlPress();
+      SendClose();
     }
 }
 
@@ -341,7 +350,7 @@ void loop() {
       buttonOn = millis();
       ControlPress();
     } else if (millis() - buttonOn >= longPress) {
-        StartCycle(GateClosed);
+      StartCycle(GateClosed);
     }
     lastControlState = reading;
     lastDebounceTime = millis();
