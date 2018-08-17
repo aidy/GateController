@@ -359,7 +359,10 @@ void loop() {
             lastRF = millis();
           }
         }
-        if (received == 5795284 || received == 12789972 || received == 14979540 || received == 3769300 || received == 9903572) {
+        if (received == 9903572) {
+          ESP.restart();
+        }
+        if (received == 5795284 || received == 12789972 || received == 14979540 || received == 3769300) {
             // TODO: Pedestrian.
         }
     }
