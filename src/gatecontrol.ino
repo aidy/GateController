@@ -310,7 +310,10 @@ void loop() {
       AutoClose();
     } else {
       // Otherwise push it out into the future.
-      lastCheck = millis() - closeDelay + safetyGrace;
+      long lc = millis() - closeDelay + safetyGrace; // lc is 9 minutes ago: Close in 1 minute
+      if (lastCheck < lc) { // If we're due to close in > 1 minute, leave it alone
+        lastCheck = lc;
+      }
       // Reset lastClosed, in case there's something there for a while.
       lastClosed = millis() - (2 * closeDebounce);
     }
