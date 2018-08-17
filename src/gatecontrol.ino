@@ -30,7 +30,7 @@ long closeDelay = 10 * 60 * 1000;
 
 long lastClosed = 0;
 long closeThreshold = 4.2 * closeDelay;
-long closeDebounce = 200;
+long closeDebounce = 500;
 
 long cycle = 0;
 long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
@@ -98,6 +98,9 @@ void setup() {
   server.on("/", [](){
     String state = "Closed";
     long nextClose = 0;
+    long now = millis();
+    long lastClosedAgo = now - lastClosed;
+    long lastCheckAgo = now - lastCheck;
     if (!GateClosed) {
       state = "Open";
       nextClose = (closeDelay - (millis() - lastCheck))/1000;
@@ -122,7 +125,7 @@ void setup() {
       nextClose = 0;
     }
 
-    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
+    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Last Closed: "+lastClosedAgo+" Last Check: "+lastCheckAgo+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
   });
 
   server.on("/open", [](){
@@ -276,7 +279,6 @@ void SafetyStop() {
 void loop() {
   // put your main code here, to run repeatedly:
   ArduinoOTA.handle();
-  server.handleClient();
   if (startup == true) {
     lastClosed = millis();
     lastControlState = digitalRead(Control);
@@ -295,16 +297,17 @@ void loop() {
     }
   }
   int positionState = digitalRead(Position);
+  long now = millis();
   if (positionState == SWITCHON) {
-    lastClosed = millis();
-    lastCheck = millis();
+    lastCheck = now;
+    lastClosed = now;
   }
-  if (millis() - lastClosed < closeDebounce) {
+  if (now - lastClosed < closeDebounce) {
     GateClosed = true;
   } else {
     GateClosed = false;
   }
-  if (millis() - lastClosed <= closeThreshold) {
+  if (!GateClosed && (millis() - lastClosed <= closeThreshold)) {
     if (digitalRead(Photocell) == SWITCHON) {
       // Only attempt to autoclose if the photocell is intact
       AutoClose();
@@ -315,7 +318,10 @@ void loop() {
         lastCheck = lc;
       }
       // Reset lastClosed, in case there's something there for a while.
-      lastClosed = millis() - (2 * closeDebounce);
+      lc = millis() - (2 * closeDebounce);
+      if (lastClosed < lc) {
+        lastClosed = lc;
+      }
     }
   }
 
@@ -336,7 +342,7 @@ void loop() {
     lastControlState = reading;
     lastDebounceTime = millis();
   }
-
+  server.handleClient();
   if (RFReceiver.available()) {
     ulong received =  RFReceiver.getReceivedValue();
     uint bl = RFReceiver.getReceivedBitlength();
