@@ -139,6 +139,24 @@ void setup() {
     //server.send(200, "text/html", "");
   });
 
+  server.on("/impulse", []() {
+    SendImpulse();
+    server.sendHeader("Location", "/");
+    server.send(303);
+  });
+
+  server.on("/status", []() {
+    String status = "closed";
+    if (!GateClosed) {
+      status = "open";
+    }
+
+    if (millis() - lastClosingSignal <= closeSignalThreshold) {
+      status = "closing";
+    }
+    server.send(200, "text/plain", status);
+  });
+
   server.on("/disableautoclose", [](){
     lastClosed = millis() - closeThreshold - 1000;
     server.sendHeader("Location", "/");
