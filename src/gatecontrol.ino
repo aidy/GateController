@@ -57,6 +57,9 @@ long closeSignalThreshold = 1500;
 long reverseTime = 4000;
 long safetyGrace = 60 * 1000;
 
+long lastPress = 0;
+long pressGrace = 5000;
+
 RCSwitch RFReceiver = RCSwitch();
 ulong lastRF = 0;
 ulong RFDebounce = 2500; // Flakey RF, so longer to allow for multiple presses.
@@ -193,6 +196,7 @@ void handleConfig() {
 }
 
 void ControlPress() {
+  lastPress = millis();
   digitalWrite(Impulse, ON);
   if (GateClosed) {
     digitalWrite(Bell, ON);
@@ -291,7 +295,7 @@ void loop() {
   }
   if (millis() - lastClosingSignal <= closeSignalThreshold) {
     // Gate is closing
-    if (digitalRead(Photocell) == SWITCHOFF) {
+    if ((digitalRead(Photocell) == SWITCHOFF) && (millis() - lastPress > pressGrace)) {
        // Photocell has been broken
        SafetyStop();
     }
