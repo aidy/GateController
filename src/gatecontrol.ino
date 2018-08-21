@@ -135,7 +135,7 @@ void setup() {
       nextClose = 0;
     }
 
-    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Last Closed: "+lastClosedAgo+" Last Check: "+lastCheckAgo+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
+    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Last Closed: "+lastClosedAgo+" Last Check: "+lastCheckAgo+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><p>Press Grace: <input type=\"text\" name=\"press_grace\" value=\""+(pressGrace/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
   });
 
   server.on("/open", [](){
@@ -196,6 +196,13 @@ void handleConfig() {
     newThreshold = server.arg("close_threshold").toInt();//strtol(value, &eptr, 10);
     if (newThreshold != 0) {
       closeThreshold = newThreshold * 1000;
+    }
+  }
+  if (server.hasArg("press_grace") && server.arg("press_grace") != NULL) {
+    long newThreshold;
+    newThreshold = server.arg("press_grace").toInt();//strtol(value, &eptr, 10);
+    if (newThreshold != 0) {
+      pressGrace = newThreshold * 1000;
     }
   }
   server.sendHeader("Location", "/");
