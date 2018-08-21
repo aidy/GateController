@@ -77,10 +77,10 @@ void setup() {
   CloseButton.setup();
   CutOut.setup();
 
-  pinMode(Control, INPUT);
-  pinMode(Position, INPUT);
-  pinMode(Photocell, INPUT);
-  pinMode(ClosingSignal, INPUT);
+  pinMode(Control, INPUT_PULLUP);
+  pinMode(Position, INPUT_PULLUP);
+  pinMode(Photocell, INPUT_PULLUP);
+  pinMode(ClosingSignal, INPUT_PULLUP);
 
   RFReceiver.enableReceive(RFPin);
 
