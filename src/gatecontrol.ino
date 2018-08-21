@@ -158,6 +158,12 @@ void setup() {
     server.send(303);
   });
 
+  server.on("/bell", []() {
+    Bell.Toggle();
+    server.sendHeader("Location", "/");
+    server.send(303);
+  });
+
   server.on("/status", []() {
     String status = "closed";
     if (!GateClosed) {
