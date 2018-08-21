@@ -14,6 +14,7 @@ const int ImpulsePin = 5;
 const int PedestrianPin = 4;
 const int CutOutPin = 2; //13;
 const int ClosePin = 14;
+const int OpenPin = 13;
 
 const int Control = 0;
 const int Position = 12;
@@ -68,6 +69,7 @@ TransistorRelay Bell(BellPin);
 TransistorRelay Impulse(ImpulsePin);
 TransistorRelay Pedestrian(PedestrianPin);
 TransistorRelay CloseButton(ClosePin);
+TransistorRelay OpenButton(OpenPin);
 Relay CutOut(CutOutPin);
 
 void setup() {
@@ -75,6 +77,7 @@ void setup() {
   Impulse.setup();
   Pedestrian.setup();
   CloseButton.setup();
+  OpenButton.setup();
   CutOut.setup();
 
   pinMode(Control, INPUT_PULLUP);
@@ -231,16 +234,12 @@ void SendClose() {
 }
 
 void Close() {
-  if (!GateClosed) {
-    CloseButton.Toggle();
-  }
+  CloseButton.Toggle();
   lastCheck = millis();
 }
 
 void Open() {
-  if (GateClosed) {
-    Impulse.Toggle();
-  }
+  OpenButton.Toggle();
   lastCheck = millis();
 }
 
