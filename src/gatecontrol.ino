@@ -56,6 +56,8 @@ long safetyGrace = 60 * 1000;
 long lastPress = 0;
 long pressGrace = 5000;
 
+bool forceClose = false;
+
 RCSwitch RFReceiver = RCSwitch();
 ulong lastRF = 0;
 ulong RFDebounce = 2500; // Flakey RF, so longer to allow for multiple presses.
@@ -147,6 +149,13 @@ void setup() {
 
   server.on("/close", []() {
     Close();
+    server.sendHeader("Location", "/");
+    server.send(303);
+    //server.send(200, "text/html", "");
+  });
+
+  server.on("/forceclose", []() {
+    ForceClose();
     server.sendHeader("Location", "/");
     server.send(303);
     //server.send(200, "text/html", "");
@@ -251,6 +260,11 @@ void Close() {
   lastCheck = millis();
 }
 
+void ForceClose() {
+  forceClose = true;
+  Close();
+}
+
 void Open() {
   OpenButton.Toggle();
   lastCheck = millis();
@@ -258,6 +272,8 @@ void Open() {
 
 void AutoClose() {
   if (millis() - lastCheck > closeDelay) {
+    // If we're trying to autoclose, we must respect the safety devices
+    forceClose = false;
     Close();
   }
 }
@@ -271,10 +287,12 @@ void EndCycle() {
 }
 
 // Do a open-close cycle, if already open, fall back to default behaviour
-void StartCycle(bool closed) {
+void LongPress(bool closed) {
   // If the gate is already open, don't schedule a close
   if (closed) {
     cycle = millis();
+  } else {
+    forceClose = true;
   }
 }
 
@@ -311,7 +329,7 @@ void loop() {
   }
   if (millis() - lastClosingSignal <= closeSignalThreshold) {
     // Gate is closing
-    if ((digitalRead(Photocell) == SWITCHOFF) && (millis() - lastPress > pressGrace)) {
+    if ((digitalRead(Photocell) == SWITCHOFF) && (millis() - lastPress > pressGrace) && (forceClose == false)) {
        // Photocell has been broken
        SafetyStop();
     }
@@ -321,6 +339,7 @@ void loop() {
   if (positionState == SWITCHON) {
     lastCheck = now;
     lastClosed = now;
+    forceClose = false;
   }
   if (now - lastClosed < closeDebounce) {
     GateClosed = true;
@@ -357,7 +376,7 @@ void loop() {
       buttonOn = millis();
       ControlPress();
     } else if (millis() - buttonOn >= longPress) {
-      StartCycle(GateClosed);
+      LongPress(GateClosed);
     }
     lastControlState = reading;
     lastDebounceTime = millis();
@@ -379,7 +398,10 @@ void loop() {
           ESP.restart();
         }
         if (received == 5795284 || received == 12789972 || received == 14979540 || received == 3769300) {
-            // TODO: Pedestrian.
+            if (millis() - lastRF > RFDebounce) {
+              ForceClose();
+              lastRF = millis();
+            }
         }
     }
     RFReceiver.resetAvailable();
