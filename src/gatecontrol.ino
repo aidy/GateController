@@ -333,13 +333,14 @@ void loop() {
        // Photocell has been broken
        SafetyStop();
     }
+  } else if (GateClosed) { // If we're not currently closing, and the gate is closed, reset forceClose
+    forceClose = false;
   }
   int positionState = digitalRead(Position);
   long now = millis();
   if (positionState == SWITCHON) {
     lastCheck = now;
     lastClosed = now;
-    forceClose = false;
   }
   if (now - lastClosed < closeDebounce) {
     GateClosed = true;
