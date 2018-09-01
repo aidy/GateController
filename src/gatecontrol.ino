@@ -6,13 +6,15 @@
 #include <TelegramBotClient.h>
 #include <ESP8266HTTPClient.h>
 #include <RCSwitch.h>
+#include <relay.h>
 #include <config.h>
 
-const int Bell = 16;
-const int Impulse = 5;
-const int Pedestrian = 4;
-const int CutOut = 2; //13;
-const int CloseButton = 14;
+const int BellPin = 16;
+const int ImpulsePin = 5;
+const int PedestrianPin = 4;
+const int CutOutPin = 2; //13;
+const int ClosePin = 14;
+const int OpenPin = 13;
 
 const int Control = 0;
 const int Position = 12;
@@ -25,7 +27,6 @@ int lastControlState = LOW;
 long debounceDelay = 10;
 long lastDebounceTime = 0;
 
-int toggleTime = 500;
 long lastCheck = 0;
 long closeDelay = 10 * 60 * 1000;
 
@@ -39,14 +40,8 @@ long cycleTime = 100 * 1000; // 40 second opening + 60 second full open
 long buttonOn = 0;
 long longPress = 1500;
 
-const int OFF = LOW;
-const int ON = HIGH;
-
 const int SWITCHOFF = HIGH;
 const int SWITCHON = LOW;
-
-const int RELAYOFF = HIGH;
-const int RELAYON = LOW;
 
 bool GateClosed = false;
 
@@ -61,6 +56,8 @@ long safetyGrace = 60 * 1000;
 long lastPress = 0;
 long pressGrace = 5000;
 
+bool forceClose = false;
+
 RCSwitch RFReceiver = RCSwitch();
 ulong lastRF = 0;
 ulong RFDebounce = 2500; // Flakey RF, so longer to allow for multiple presses.
@@ -70,23 +67,25 @@ TelegramBotClient telegram (BotToken, net_ssl);
 
 ESP8266WebServer server(80);
 
+TransistorRelay Bell(BellPin);
+TransistorRelay Impulse(ImpulsePin);
+TransistorRelay Pedestrian(PedestrianPin);
+TransistorRelay CloseButton(ClosePin);
+TransistorRelay OpenButton(OpenPin);
+Relay CutOut(CutOutPin);
+
 void setup() {
-  pinMode(Bell, OUTPUT);
-  pinMode(Impulse, OUTPUT);
-  pinMode(Pedestrian, OUTPUT);
-  pinMode(CutOut, OUTPUT);
-  pinMode(CloseButton, OUTPUT);
+  Bell.setup();
+  Impulse.setup();
+  Pedestrian.setup();
+  CloseButton.setup();
+  OpenButton.setup();
+  CutOut.setup();
 
-  pinMode(Control, INPUT);
-  pinMode(Position, INPUT);
-  pinMode(Photocell, INPUT);
-  pinMode(ClosingSignal, INPUT);
-
-  digitalWrite(Bell, OFF);
-  digitalWrite(Impulse, OFF);
-  digitalWrite(Pedestrian, OFF);
-  digitalWrite(CloseButton, OFF);
-  digitalWrite(CutOut, RELAYOFF);
+  pinMode(Control, INPUT_PULLUP);
+  pinMode(Position, INPUT_PULLUP);
+  pinMode(Photocell, INPUT_PULLUP);
+  pinMode(ClosingSignal, INPUT_PULLUP);
 
   RFReceiver.enableReceive(RFPin);
 
@@ -97,8 +96,15 @@ void setup() {
   pinMode(15, OUTPUT);
   digitalWrite(15, ON);
   */
-  WiFi.config(ip, gateway, subnet);
-  WiFi.begin(ssid, password);
+  IPAddress ip;
+  IPAddress gw;
+  IPAddress subnet;
+  ip.fromString(IP_ADDRESS);
+  gw.fromString(IP_GATEWAY);
+  subnet.fromString(IP_SUBNET);
+
+  WiFi.config(ip, gw, subnet);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   WiFi.mode(WIFI_STA);
 
   server.on("/", [](){
@@ -131,7 +137,7 @@ void setup() {
       nextClose = 0;
     }
 
-    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Last Closed: "+lastClosedAgo+" Last Check: "+lastCheckAgo+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
+    server.send(200, "text/html", "<p>Gate is: "+state+"</p><p>Last Closed: "+lastClosedAgo+" Last Check: "+lastCheckAgo+"</p><p>Autoclose is: "+autoclose+"</p><p>Closing in: "+nextClose+"</p><form action=\"/config\" method=\"POST\"><p>AutoClose Delay: <input type=\"text\" name=\"close_delay\" value=\""+(closeDelay/1000)+"\"></p><p>AutoClose Threshold: <input type=\"text\" name\"close_threshold\" value=\""+(closeThreshold/1000)+"\"><p>Press Grace: <input type=\"text\" name=\"press_grace\" value=\""+(pressGrace/1000)+"\"><input type=\"submit\" value=\"Submit\"></form></p>");
   });
 
   server.on("/open", [](){
@@ -148,8 +154,21 @@ void setup() {
     //server.send(200, "text/html", "");
   });
 
+  server.on("/forceclose", []() {
+    ForceClose();
+    server.sendHeader("Location", "/");
+    server.send(303);
+    //server.send(200, "text/html", "");
+  });
+
   server.on("/impulse", []() {
     SendImpulse();
+    server.sendHeader("Location", "/");
+    server.send(303);
+  });
+
+  server.on("/bell", []() {
+    Bell.Toggle();
     server.sendHeader("Location", "/");
     server.send(303);
   });
@@ -194,19 +213,26 @@ void handleConfig() {
       closeThreshold = newThreshold * 1000;
     }
   }
+  if (server.hasArg("press_grace") && server.arg("press_grace") != NULL) {
+    long newThreshold;
+    newThreshold = server.arg("press_grace").toInt();//strtol(value, &eptr, 10);
+    if (newThreshold != 0) {
+      pressGrace = newThreshold * 1000;
+    }
+  }
   server.sendHeader("Location", "/");
   server.send(303);
 }
 
 void ControlPress() {
   lastPress = millis();
-  digitalWrite(Impulse, ON);
+  Impulse.Switch(true);
   if (GateClosed) {
-    digitalWrite(Bell, ON);
+    Bell.Switch(true);
   }
-  delay(toggleTime);
-  digitalWrite(Impulse, OFF);
-  digitalWrite(Bell, OFF);
+  delay(Impulse.toggleTime);
+  Impulse.Switch(false);
+  Bell.Switch(false);
   if (GateClosed) {
     if (NotifyURL != "") {
       HTTPClient http;
@@ -222,33 +248,32 @@ void ControlPress() {
 }
 
 void SendImpulse() {
-  digitalWrite(Impulse, ON);
-  delay(toggleTime);
-  digitalWrite(Impulse, OFF);
+  Impulse.Toggle();
 }
 
 void SendClose() {
-  digitalWrite(CloseButton, ON);
-  delay(toggleTime);
-  digitalWrite(CloseButton, OFF);
+  CloseButton.Toggle();
 }
 
 void Close() {
-  if (!GateClosed) {
-    SendClose();
-  }
+  CloseButton.Toggle();
   lastCheck = millis();
 }
 
+void ForceClose() {
+  forceClose = true;
+  Close();
+}
+
 void Open() {
-  if (GateClosed) {
-    SendImpulse();
-  }
+  OpenButton.Toggle();
   lastCheck = millis();
 }
 
 void AutoClose() {
   if (millis() - lastCheck > closeDelay) {
+    // If we're trying to autoclose, we must respect the safety devices
+    forceClose = false;
     Close();
   }
 }
@@ -262,17 +287,17 @@ void EndCycle() {
 }
 
 // Do a open-close cycle, if already open, fall back to default behaviour
-void StartCycle(bool closed) {
+void LongPress(bool closed) {
   // If the gate is already open, don't schedule a close
   if (closed) {
     cycle = millis();
+  } else {
+    forceClose = true;
   }
 }
 
 void StopGate() {
-  digitalWrite(CutOut, RELAYON);
-  delay(500);
-  digitalWrite(CutOut, RELAYOFF);
+  CutOut.Toggle();
 }
 
 /*
@@ -284,7 +309,7 @@ void StopGate() {
 void SafetyStop() {
   StopGate();
   delay(100);
-  SendImpulse();
+  Impulse.Toggle();
   delay(reverseTime);
   StopGate();
 }
@@ -304,10 +329,12 @@ void loop() {
   }
   if (millis() - lastClosingSignal <= closeSignalThreshold) {
     // Gate is closing
-    if ((digitalRead(Photocell) == SWITCHOFF) && (millis() - lastPress > pressGrace)) {
+    if ((digitalRead(Photocell) == SWITCHOFF) && (millis() - lastPress > pressGrace) && (forceClose == false)) {
        // Photocell has been broken
        SafetyStop();
     }
+  } else if (GateClosed) { // If we're not currently closing, and the gate is closed, reset forceClose
+    forceClose = false;
   }
   int positionState = digitalRead(Position);
   long now = millis();
@@ -350,7 +377,7 @@ void loop() {
       buttonOn = millis();
       ControlPress();
     } else if (millis() - buttonOn >= longPress) {
-      StartCycle(GateClosed);
+      LongPress(GateClosed);
     }
     lastControlState = reading;
     lastDebounceTime = millis();
@@ -372,7 +399,10 @@ void loop() {
           ESP.restart();
         }
         if (received == 5795284 || received == 12789972 || received == 14979540 || received == 3769300) {
-            // TODO: Pedestrian.
+            if (millis() - lastRF > RFDebounce) {
+              ForceClose();
+              lastRF = millis();
+            }
         }
     }
     RFReceiver.resetAvailable();
